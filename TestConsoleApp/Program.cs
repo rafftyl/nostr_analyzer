@@ -1,17 +1,17 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using NNostr.Client;
+using NostrSandbox.NostrDb;
 
 const string messageSubscription = "last-three-days";
 const string contactListSubscription = "contact-lists";
-const string contactListCacheFile = "contactLists.json";
 const string userPublicKey = "npub1wvjwqk55d3n20qv06rq2e2qtvra3a90auv340mc6yzrnq0wsrp0qkdmy82";
 
 TimeSpan contactListTimespan = TimeSpan.FromDays(30);
 TimeSpan meassageListTimespan = TimeSpan.FromDays(3);
 
-HashSet<string> connectedRelays = new();
 List<string> initialRelays = new()
 {
     "wss://nostr.wine",
@@ -36,15 +36,15 @@ foreach (var relayUri in initialRelays)
 await Task.WhenAll(connectTaskList.ToArray());
 Console.WriteLine($"Finished connecting to relays");
 
-bool hasCachedContactLists = File.Exists(contactListCacheFile);
-Dictionary<string, List<string>>? contactListsPerUser = hasCachedContactLists 
-    ? JsonSerializer.Deserialize<Dictionary<string, List<string>>>(File.ReadAllText(contactListCacheFile))
-    : new();
-if (contactListsPerUser == null)
+Console.WriteLine("Initializing database...");
+string appDataLocalPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+string dataDirectory = Path.Combine(appDataLocalPath, "NostrSandbox");
+if (!Directory.Exists(dataDirectory))
 {
-    Console.Error.WriteLine("Failed to deserialize contact list cache. Delete the file manually");
-    return;
+    Directory.CreateDirectory(dataDirectory);
 }
+await using var dbContext = new NostrDbContext(dataDirectory);
+dbContext.Database.EnsureCreated();
 
 HashSet<string> processedMessageEvents = new();
 CountdownEvent contactListProcessingCountdown = new(clients.Count);
@@ -80,24 +80,49 @@ foreach (var client in clients)
             }
             case contactListSubscription:
             {
-                lock (contactListsPerUser)
+                lock (dbContext)
                 {
                     foreach (var receivedEvent in arguments.events)
                     {
-                        if (!contactListsPerUser.TryGetValue(receivedEvent.PublicKey, out var contactList))
+                        UserData userData = dbContext.Users
+                            .Include(user => user.Contacts)
+                            .FirstOrDefault(user => user.PublicKey == receivedEvent.PublicKey) ??
+                                            throw new InvalidOperationException();
+                        if (userData == null)
                         {
-                            contactList = new List<string>();
-                            contactListsPerUser.Add(receivedEvent.PublicKey, contactList);
+                            Console.WriteLine($"Adding user {receivedEvent.PublicKey}");
+                            userData = new UserData { PublicKey = receivedEvent.PublicKey };
+                            dbContext.Users.Add(userData);
+                            continue;
                         }
 
                         foreach (var tag in receivedEvent.Tags)
                         {
                             if (tag.TagIdentifier == "p")
                             {
-                                contactList.Add(tag.Data[0]);
+                                string contactPublicKey = tag.Data[0];
+                                bool contactExists = userData.Contacts.Any(contactListEntry => contactListEntry.Contact.PublicKey == contactPublicKey);
+                                if (contactExists)
+                                {
+                                    continue;
+                                }
+                                
+                                UserData contactUserData = dbContext.Users
+                                    .FirstOrDefault(user => user.PublicKey == receivedEvent.PublicKey) ?? throw new InvalidOperationException();
+                                if (contactUserData == null)
+                                {
+                                    Console.WriteLine($"Adding user {contactPublicKey}");
+                                    contactUserData = new UserData() { PublicKey = contactPublicKey };
+                                    dbContext.Users.Add(contactUserData);
+                                }
+                                
+                                Console.WriteLine($"Adding contact {contactPublicKey} to user {receivedEvent.PublicKey}");
+                                userData.Contacts.Add(new ContactListEntry(){Contact = contactUserData});
                             }
                         }
                     }
+
+                    dbContext.SaveChanges();
                 }
 
                 break;
@@ -124,44 +149,36 @@ foreach (var client in clients)
         }
     };
 
-    if (!hasCachedContactLists)
-    {
-        contactListTasks.Add(client.CreateSubscription(contactListSubscription,
-            new[]
+    contactListTasks.Add(client.CreateSubscription(contactListSubscription,
+        new[]
+        {
+            new NostrSubscriptionFilter()
             {
-                new NostrSubscriptionFilter()
-                {
-                    Kinds = new[] { 3 },
-                    Since = DateTimeOffset.Now - contactListTimespan,
-                }
-            }));
-    }
+                Kinds = new[] { 3 },
+                Since = DateTimeOffset.Now - contactListTimespan,
+            }
+        }));
 }
 
-if (!hasCachedContactLists)
+await Task.WhenAll(contactListTasks.ToArray());
+await Task.Run(() => contactListProcessingCountdown.Wait());
+List<Task> closeTasks = new();
+foreach (var client in clients)
 {
-    await Task.WhenAll(contactListTasks.ToArray());
-    await Task.Run(() => contactListProcessingCountdown.Wait());
-
-    List<Task> closeTasks = new();
-    foreach (var client in clients)
-    {
-        closeTasks.Add(client.CloseSubscription(contactListSubscription));
-    }
-    await Task.WhenAll(closeTasks.ToArray());
-
-    Console.WriteLine("Fetched contact lists. Caching...");
-    await using var file = File.OpenWrite(contactListCacheFile);
-    JsonSerializer.Serialize(file, contactListsPerUser);
-    Console.WriteLine("Caching done");
+    closeTasks.Add(client.CloseSubscription(contactListSubscription));
 }
+await Task.WhenAll(closeTasks.ToArray());
 
-if (!contactListsPerUser.TryGetValue(userPublicKey, out var userContactList))
+var user = dbContext.Users
+    .Include(user => user.Contacts)
+    .FirstOrDefault(user => user.PublicKey == userPublicKey);
+if (user == null)
 {
     Console.Error.WriteLine($"No contact list found for user {userPublicKey}. Aborting.");
     return;
 }
 
+var userContacts = user.Contacts.Select(entry => entry.Contact.PublicKey).ToArray();
 List<Task> messageSubscriptionTasks = new();
 foreach (var client in clients)
 {
@@ -172,7 +189,7 @@ foreach (var client in clients)
             {
                 Kinds = new[] { 1 },
                 Since = DateTimeOffset.Now - meassageListTimespan,
-                Authors = userContactList.ToArray()
+                Authors = userContacts
             }
         }));
 }

@@ -14,7 +14,7 @@ public class DatabaseTests
             File.Delete(NostrDbContext.DatabaseFileName);
         }
         
-        using var dbContext = new NostrDbContext();
+        using var dbContext = new NostrDbContext("");
         dbContext.Database.EnsureCreated();
         UserData user1 = new() { PublicKey = "user1_public_key" };
         UserData user2 = new() { PublicKey = "user2_public_key" };

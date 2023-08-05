@@ -20,17 +20,26 @@ public record ContactListEntry
 
 public class NostrDbContext : DbContext
 {
+    private string dbDirectory;
+    
     public const string DatabaseFileName = "nostrDatabase.db";
     public DbSet<UserData> Users { get; set; }
     public DbSet<ContactListEntry> Contacts { get; set; }
 
+    public NostrDbContext(string dbDirectory)
+    {
+        this.dbDirectory = dbDirectory;
+    }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseSqlite($"Data Source={DatabaseFileName}");
+        optionsBuilder.UseSqlite($"Data Source={Path.Combine(dbDirectory, DatabaseFileName)}");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserData>(builder => builder.HasIndex(user => user.PublicKey).IsUnique());
+        
         modelBuilder.Entity<ContactListEntry>()
             .HasOne(entry => entry.Owner)
             .WithMany(entry => entry.Contacts)
