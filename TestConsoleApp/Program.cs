@@ -8,6 +8,9 @@ const string contactListSubscription = "contact-lists";
 const string contactListCacheFile = "contactLists.json";
 const string userPublicKey = "npub1wvjwqk55d3n20qv06rq2e2qtvra3a90auv340mc6yzrnq0wsrp0qkdmy82";
 
+TimeSpan contactListTimespan = TimeSpan.FromDays(30);
+TimeSpan meassageListTimespan = TimeSpan.FromDays(3);
+
 HashSet<string> connectedRelays = new();
 List<string> initialRelays = new()
 {
@@ -20,15 +23,17 @@ List<string> initialRelays = new()
 };
 
 List<NostrClient> clients = new();
+List<Task> connectTaskList = new();
 foreach (var relayUri in initialRelays)
 {
     Console.WriteLine($"Connecting to relay {relayUri}...");
     var client = new NostrClient(new Uri(relayUri));
-    await client.ConnectAndWaitUntilConnected();
+    connectTaskList.Add(client.ConnectAndWaitUntilConnected());
     clients.Add(client);
     Console.WriteLine($"Connected to relay {relayUri}");
 }
 
+await Task.WhenAll(connectTaskList.ToArray());
 Console.WriteLine($"Finished connecting to relays");
 
 bool hasCachedContactLists = File.Exists(contactListCacheFile);
@@ -126,7 +131,8 @@ foreach (var client in clients)
             {
                 new NostrSubscriptionFilter()
                 {
-                    Kinds = new[] { 3 }
+                    Kinds = new[] { 3 },
+                    Since = DateTimeOffset.Now - contactListTimespan,
                 }
             }));
     }
@@ -165,7 +171,7 @@ foreach (var client in clients)
             new NostrSubscriptionFilter()
             {
                 Kinds = new[] { 1 },
-                Since = DateTimeOffset.Now - TimeSpan.FromDays(3),
+                Since = DateTimeOffset.Now - meassageListTimespan,
                 Authors = userContactList.ToArray()
             }
         }));
