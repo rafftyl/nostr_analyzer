@@ -6,7 +6,7 @@ public record UserData
 {
     public int Id { get; set; }
     public string PublicKey { get; set; } = "";
-    public ICollection<ContactListEntry> Contacts { get; set; } = new List<ContactListEntry>();
+    public List<ContactListEntry> Contacts { get; set; } = new ();
 }
 
 public record ContactListEntry
