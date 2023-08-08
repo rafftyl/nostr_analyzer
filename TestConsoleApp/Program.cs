@@ -1,6 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using TestConsoleApp;
+﻿using TestConsoleApp;
 
 //change this to your own public key (hex format)
 const string userHexPublicKey = "7324e05a946c66a7818fd0c0aca80b60fb1e95fde32357ef1a2087303dd0185e";
@@ -26,23 +24,36 @@ await clientGroup.WaitForMessageEose();
 //the contents of the file should look like:
 //OPENAI_KEY: <your key here>
 FeedAnalyzer analyzer = new("E:/OpenAI", "OpenAiApiKey.txt");
-// string topic = "bitcoin";
-// Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
-// var foundPosts = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
-//
-// string appDataLocalPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-// string resultPath = Path.Combine(appDataLocalPath, "NostrSandbox", $"{topic}-from-{timeSpan.Days}-days-{timeSpan.Hours}-hours.txt");
-// File.WriteAllText(resultPath, string.Join("\n\n===================\n\n", foundPosts.Select(post => post.Replace(@"\n", "\n"))));
-
-try
+var mode = Mode.Summarize;
+switch (mode)
 {
-	Console.WriteLine($"Summarizing {clientGroup.Feed.Count} posts.");
-	//this motherfucker can hit ChatGPT's token limit very fast
-	//try limiting the number of posts by changing timeSpan and discarding long notes
-	string summary = await analyzer.SummarizeAsync(clientGroup.Feed.Where(post => post.Length < 500));
-	Console.WriteLine(summary);
+	case Mode.Summarize:
+		try
+		{
+			Console.WriteLine($"Summarizing {clientGroup.Feed.Count} posts.");
+			//this motherfucker can hit ChatGPT's token limit very fast
+			//try limiting the number of posts by changing timeSpan and discarding long notes
+			string summary = await analyzer.SummarizeAsync(clientGroup.Feed.Where(post => post.Length < 500));
+			Console.WriteLine(summary);
+		}
+		catch (Exception e)
+		{
+			Console.WriteLine(e.Message);
+		}
+		break;
+	case Mode.FindNodes:
+		string topic = "bitcoin";
+		Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
+		var foundPosts = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
+		string resultPath = $"{topic}-from-{timeSpan.Days}-days-{timeSpan.Hours}-hours.txt";
+		File.WriteAllText(resultPath, string.Join("\n\n===================\n\n", foundPosts.Select(post => post.Replace(@"\n", "\n"))));
+		break;
+	default:
+		throw new ArgumentOutOfRangeException();
 }
-catch (Exception e)
+
+enum Mode
 {
-	Console.WriteLine(e.Message);
+	Summarize,
+	FindNodes
 }
