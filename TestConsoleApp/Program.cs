@@ -2,6 +2,7 @@
 
 using TestConsoleApp;
 
+//change this to your own public key (hex format)
 const string userHexPublicKey = "7324e05a946c66a7818fd0c0aca80b60fb1e95fde32357ef1a2087303dd0185e";
 List<string> relays = new()
 {
@@ -21,6 +22,9 @@ var timeSpan = TimeSpan.FromHours(1);
 await clientGroup.SubscribeToMessageEventsAsync(userHexPublicKey, timeSpan);
 await clientGroup.WaitForMessageEose();
 
+//change those paths to point to your OpenAI key
+//the contents of the file should look like:
+//OPENAI_KEY: <your key here>
 FeedAnalyzer analyzer = new("E:/OpenAI", "OpenAiApiKey.txt");
 // string topic = "bitcoin";
 // Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
@@ -33,6 +37,8 @@ FeedAnalyzer analyzer = new("E:/OpenAI", "OpenAiApiKey.txt");
 try
 {
 	Console.WriteLine($"Summarizing {clientGroup.Feed.Count} posts.");
+	//this motherfucker can hit ChatGPT's token limit very fast
+	//try limiting the number of posts by changing timeSpan and discarding long notes
 	string summary = await analyzer.SummarizeAsync(clientGroup.Feed.Where(post => post.Length < 500));
 	Console.WriteLine(summary);
 }
