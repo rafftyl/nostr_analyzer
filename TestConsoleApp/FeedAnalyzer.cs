@@ -40,14 +40,28 @@ class FeedAnalyzer
 	public async Task<List<string>> GetPostsAboutATopicAsync(IEnumerable<string> allPosts, string topic)
 	{
 		List<string> selectedPosts = new();
-		foreach (var post in allPosts)
+		var postList = allPosts.ToList();
+		for (var postIndex = 0; postIndex < postList.Count; postIndex++)
 		{
-			string result = await AnalyzePost(post, topic);
-			if (result.ToLower() == "yes")
+			var post = postList[postIndex];
+			try
 			{
-				Console.WriteLine($"Found a new post about {topic}!");
-				selectedPosts.Add(post);
+				string result = await AnalyzePost(post, topic);
+				if (result.ToLower() == "yes")
+				{
+					Console.WriteLine($"Found a new post about {topic}!");
+					selectedPosts.Add(post);
+				}
 			}
+			catch (Exception e)
+			{
+				Console.WriteLine("Exception when analyzing post:");
+				Console.WriteLine(e.Message);
+				Console.WriteLine("Post content:");
+				Console.WriteLine(post);
+			}
+
+			Console.WriteLine($"Processed {postIndex + 1} / {postList.Count} posts.");
 		}
 
 		return selectedPosts;
