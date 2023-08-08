@@ -21,10 +21,10 @@ await clientGroup.SubscribeToMessageEventsAsync(timeSpan);
 await clientGroup.WaitForMessageEose();
 
 FeedAnalyzer analyzer = new();
-string topic = "food";
+string topic = "bitcoin";
 Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
-var summary = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
+var foundPosts = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
 
 string appDataLocalPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-string resultPath = Path.Combine(appDataLocalPath, "NostrSandbox", $"{topic}.txt");
-File.WriteAllText(resultPath, string.Join("\n\n", summary));
+string resultPath = Path.Combine(appDataLocalPath, "NostrSandbox", $"{topic}-from-{timeSpan.Days}-days-{timeSpan.Hours}-hours.txt");
+File.WriteAllText(resultPath, string.Join("\n\n===================\n\n", foundPosts.Select(post => post.ReplaceLineEndings())));
