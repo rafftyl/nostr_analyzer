@@ -1,7 +1,10 @@
 ﻿using System.Net.WebSockets;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NNostr.Client;
 using NostrSandbox.NostrDb;
+
+namespace TestConsoleApp;
 
 public class NostrClientGroup : IDisposable, IAsyncDisposable
 {
@@ -18,7 +21,9 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 	private readonly HashSet<string> processedMessageEvents = new();
 	private CountdownEvent? contactListProcessingCountdown;
 	private CountdownEvent? messageProcessingCountdown;
-	
+
+	public List<string> Feed { get; } = new();
+
 	public NostrClientGroup()
 	{
 		Console.WriteLine("Initializing database...");
@@ -165,12 +170,15 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 							continue;
 						}
 
-						Console.WriteLine($"Author: {receivedEvent.PublicKey}");
-						Console.WriteLine("Content:");
-						Console.WriteLine(receivedEvent.Content);
-						Console.WriteLine();
+						StringBuilder builder = new();
+
+						builder.AppendLine($"Author: {receivedEvent.PublicKey}");
+						builder.AppendLine($"PostId: {receivedEvent.Id}");
+						builder.AppendLine("Content:");
+						builder.AppendLine(receivedEvent.Content);
 
 						processedMessageEvents.Add(receivedEvent.Id);
+						Feed.Add(builder.ToString());
 					}
 				}
 			};
