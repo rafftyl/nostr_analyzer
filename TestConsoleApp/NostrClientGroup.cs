@@ -12,9 +12,6 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 	private const string ContactListSubscriptionName = "contact-lists";
 	private const string UserPublicKey = "7324e05a946c66a7818fd0c0aca80b60fb1e95fde32357ef1a2087303dd0185e";
 
-	private readonly TimeSpan contactListTimespan = TimeSpan.FromDays(365);
-	private readonly TimeSpan messageListTimespan = TimeSpan.FromDays(3);
-	
 	private readonly List<NostrClient> clients = new();
 	private readonly NostrDbContext dbContext;
 
@@ -62,7 +59,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 		Console.WriteLine($"Finished connecting to relays");
 	}
 
-	public async Task SubscribeToContactListEventsAsync()
+	public async Task SubscribeToContactListEventsAsync(TimeSpan contactListTimespan)
 	{
 		List<Task> contactListTasks = new();
 		contactListProcessingCountdown?.Dispose();
@@ -146,7 +143,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 		await Task.WhenAll(contactListTasks.ToArray());
 	}
 	
-	public async Task SubscribeToMessageEventsAsync()
+	public async Task SubscribeToMessageEventsAsync(TimeSpan messageListTimespan)
 	{
 		List<Task> messageListTasks = new();
 		messageProcessingCountdown?.Dispose();

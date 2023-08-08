@@ -45,7 +45,7 @@ class FeedAnalyzer
 			string result = await AnalyzePost(post, topic);
 			if (result.ToLower() == "yes")
 			{
-				Console.WriteLine($"Found a new post about {topic}");
+				Console.WriteLine($"Found a new post about {topic}!");
 				selectedPosts.Add(post);
 			}
 		}

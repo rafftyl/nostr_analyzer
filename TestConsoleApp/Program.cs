@@ -12,17 +12,19 @@ List<string> relays = new()
 await using var clientGroup = new NostrClientGroup();
 await clientGroup.ConnectToRelaysAsync(relays);
 
-await clientGroup.SubscribeToContactListEventsAsync();
+await clientGroup.SubscribeToContactListEventsAsync(TimeSpan.FromDays(365));
 await clientGroup.WaitForContactListEose();
 await clientGroup.CloseContactListSubscription();
 
-await clientGroup.SubscribeToMessageEventsAsync();
+var timeSpan = TimeSpan.FromDays(1);
+await clientGroup.SubscribeToMessageEventsAsync(timeSpan);
 await clientGroup.WaitForMessageEose();
 
 FeedAnalyzer analyzer = new();
 string topic = "food";
 try
 {
+	Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
 	var summary = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
 	Console.WriteLine(string.Join("\n\n", summary));
 }
