@@ -6,12 +6,11 @@ using NostrSandbox.NostrDb;
 
 namespace TestConsoleApp;
 
-public class NostrClientGroup : IDisposable, IAsyncDisposable
+public class NostrConnection : IDisposable, IAsyncDisposable
 {
 	private const string MessageSubscriptionName = "messages";
 	private const string ContactListSubscriptionName = "contact-lists";
-	private const string UserPublicKey = "7324e05a946c66a7818fd0c0aca80b60fb1e95fde32357ef1a2087303dd0185e";
-
+    
 	private readonly List<NostrClient> clients = new();
 	private readonly NostrDbContext dbContext;
 
@@ -21,7 +20,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 
 	public List<string> Feed { get; } = new();
 
-	public NostrClientGroup()
+	public NostrConnection()
 	{
 		Console.WriteLine("Initializing database...");
 		string appDataLocalPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -59,7 +58,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 		Console.WriteLine($"Finished connecting to relays");
 	}
 
-	public async Task SubscribeToContactListEventsAsync(TimeSpan contactListTimespan)
+	public async Task SubscribeToContactListEventsAsync(string userPublicKey, TimeSpan contactListTimespan)
 	{
 		List<Task> contactListTasks = new();
 		contactListProcessingCountdown?.Dispose();
@@ -135,7 +134,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 					{
 						Kinds = new[] { 3 },
 						Since = DateTimeOffset.Now - contactListTimespan,
-						Authors = new[] { UserPublicKey }
+						Authors = new[] { userPublicKey }
 					}
 				}));
 		}
@@ -143,7 +142,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 		await Task.WhenAll(contactListTasks.ToArray());
 	}
 	
-	public async Task SubscribeToMessageEventsAsync(TimeSpan messageListTimespan)
+	public async Task SubscribeToMessageEventsAsync(string userPublicKey, TimeSpan messageListTimespan)
 	{
 		List<Task> messageListTasks = new();
 		messageProcessingCountdown?.Dispose();
@@ -170,6 +169,7 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 						StringBuilder builder = new();
 
 						builder.AppendLine($"Author: {receivedEvent.PublicKey}");
+						builder.AppendLine($"Date: {receivedEvent.CreatedAt}");
 						builder.AppendLine($"PostId: {receivedEvent.Id}");
 						builder.AppendLine("Content:");
 						builder.AppendLine(receivedEvent.Content);
@@ -192,10 +192,10 @@ public class NostrClientGroup : IDisposable, IAsyncDisposable
 
 			var user = dbContext.Users
 				.Include(user => user.Contacts)
-				.FirstOrDefault(user => user.PublicKey == UserPublicKey);
+				.FirstOrDefault(user => user.PublicKey == userPublicKey);
 			if (user == null)
 			{
-				Console.Error.WriteLine($"No contact list found for user {UserPublicKey}. Aborting.");
+				Console.Error.WriteLine($"No contact list found for user {userPublicKey}. Aborting.");
 				return;
 			}
 			
