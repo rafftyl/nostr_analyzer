@@ -90,14 +90,17 @@ class FeedAnalyzer
 		                "PostId: <a unique identifier of a given post>\n" +
 		                "Content:\n <the post's content (plain text)>\n\n" +
 		                "In response, I want you to write a short summary of everything you've learned from those posts.\n" +
-		                "Skip any posts that don't provide any new information and just express attitudes like excitement, " +
-		                "condemnation. When you mention a piece of info, try to provide a PostId from which it is sourced.";
+		                "Skip any posts that don't provide any new information and just express attitudes like excitement or " +
+		                "condemnation, contain only emojis or have unclear context. " +
+		                "When you mention a piece of info, try to provide a PostId or (multiple PostIds) from which it is sourced.";
 
 		string initialResponse = "I understand. I will write short summaries based on the posts you provide, trying to stick to informative posts only.";
 		string request = string.Join("\n\n", posts);
 		
 		chat.AppendUserInput(prompt);
 		chat.AppendExampleChatbotOutput(initialResponse);
+		
+		Console.WriteLine($"Summarizing feed string with {request.Length} signs in total.");
 		chat.AppendUserInput(request);
 		return await chat.GetResponseFromChatbotAsync();
 	}

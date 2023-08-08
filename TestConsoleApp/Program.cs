@@ -9,16 +9,16 @@ List<string> relays = new()
 	"wss://relayable.org"
 };
 
-await using var clientGroup = new NostrConnection();
-await clientGroup.ConnectToRelaysAsync(relays);
+await using var nostrConnection = new NostrConnection();
+await nostrConnection.ConnectToRelaysAsync(relays);
 
-await clientGroup.SubscribeToContactListEventsAsync(userHexPublicKey, TimeSpan.FromDays(365));
-await clientGroup.WaitForContactListEose();
-await clientGroup.CloseContactListSubscription();
+await nostrConnection.SubscribeToContactListEventsAsync(userHexPublicKey, TimeSpan.FromDays(365));
+await nostrConnection.WaitForContactListEose();
+await nostrConnection.CloseContactListSubscription();
 
-var timeSpan = TimeSpan.FromHours(1);
-await clientGroup.SubscribeToMessageEventsAsync(userHexPublicKey, timeSpan);
-await clientGroup.WaitForMessageEose();
+var timeSpan = TimeSpan.FromDays(7);
+await nostrConnection.SubscribeToMessageEventsAsync(userHexPublicKey, timeSpan);
+await nostrConnection.WaitForMessageEose();
 
 //change those paths to point to your OpenAI key
 //the contents of the file should look like:
@@ -28,26 +28,62 @@ var mode = Mode.Summarize;
 switch (mode)
 {
 	case Mode.Summarize:
-		try
+	{
+		async Task SummarizeAndPrintToConsole(List<string> postsToSummarize)
 		{
-			Console.WriteLine($"Summarizing {clientGroup.Feed.Count} posts.");
-			//this motherfucker can hit ChatGPT's token limit very fast
-			//try limiting the number of posts by changing timeSpan and discarding long notes
-			string summary = await analyzer.SummarizeAsync(clientGroup.Feed.Where(post => post.Length < 500));
-			Console.WriteLine(summary);
+			try
+			{
+				string summary = await analyzer.SummarizeAsync(postsToSummarize);
+				Console.WriteLine(summary);
+			}
+			catch (Exception e)
+			{
+				Console.WriteLine(e.Message);
+			}
+			
+			Console.WriteLine();
 		}
-		catch (Exception e)
+
+		Console.WriteLine($"Summarizing {nostrConnection.Feed.Count} posts.");
+
+		//this motherfucker can hit ChatGPT's token limit very fast
+		//so the feed is chunked and chunks get summarized separately
+		const int maxSignsInChunk = 5000;
+		int currentLength = 0;
+		List<string> postBuffer = new();
+		foreach (var post in nostrConnection.Feed)
 		{
-			Console.WriteLine(e.Message);
+			if (post.Length > maxSignsInChunk)
+			{
+				continue;
+			}
+
+			currentLength += post.Length;
+			if (currentLength >= maxSignsInChunk)
+			{
+				await SummarizeAndPrintToConsole(postBuffer);
+				postBuffer.Clear();
+				currentLength = 0;
+			}
+			postBuffer.Add(post);
+		}
+		
+		if (postBuffer.Count > 0)
+		{
+			await SummarizeAndPrintToConsole(postBuffer);
 		}
 		break;
+	}
 	case Mode.FindNodes:
+	{
 		string topic = "bitcoin";
-		Console.WriteLine($"Analyzing {clientGroup.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
-		var foundPosts = await analyzer.GetPostsAboutATopicAsync(clientGroup.Feed, topic);
+		Console.WriteLine($"Analyzing {nostrConnection.Feed.Count} posts from last {timeSpan}, looking for info about {topic}");
+		var foundPosts = await analyzer.GetPostsAboutATopicAsync(nostrConnection.Feed, topic);
 		string resultPath = $"{topic}-from-{timeSpan.Days}-days-{timeSpan.Hours}-hours.txt";
-		File.WriteAllText(resultPath, string.Join("\n\n===================\n\n", foundPosts.Select(post => post.Replace(@"\n", "\n"))));
+		File.WriteAllText(resultPath, string.Join("\n\n===================\n\n", 
+			foundPosts.Select(post => post.Replace(@"\n", "\n"))));
 		break;
+	}
 	default:
 		throw new ArgumentOutOfRangeException();
 }
