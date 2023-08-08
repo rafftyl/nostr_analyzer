@@ -16,9 +16,10 @@ await nostrConnection.SubscribeToContactListEventsAsync(userHexPublicKey, TimeSp
 await nostrConnection.WaitForContactListEose();
 await nostrConnection.CloseContactListSubscription();
 
-var timeSpan = TimeSpan.FromDays(7);
+var timeSpan = TimeSpan.FromDays(3);
 await nostrConnection.SubscribeToMessageEventsAsync(userHexPublicKey, timeSpan);
 await nostrConnection.WaitForMessageEose();
+await nostrConnection.CloseMessageSubscription();
 
 //change those paths to point to your OpenAI key
 //the contents of the file should look like:

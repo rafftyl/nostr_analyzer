@@ -240,7 +240,7 @@ public class NostrConnection : IDisposable, IAsyncDisposable
 		await CloseSubscription(ContactListSubscriptionName);
 	}
 	
-	public async Task CloseMessageListSubscription()
+	public async Task CloseMessageSubscription()
 	{
 		await CloseSubscription(MessageSubscriptionName);
 	}
